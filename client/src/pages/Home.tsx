@@ -677,38 +677,34 @@ export default function Home() {
 
       {/* 资源类型选择对话框 */}
       <Dialog open={showResourceTypeDialog} onOpenChange={setShowResourceTypeDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>选择资源类型</DialogTitle>
-            <DialogDescription>选择您要添加的资源类型</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
             <button
               onClick={() => handleSelectResourceType('website')}
-              className="w-full p-4 border border-slate-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all text-left"
+              className="flex flex-col items-center p-3 border border-slate-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all"
             >
-              <div className="text-2xl mb-2">🌐</div>
-              <div className="font-medium text-sm">网站</div>
-              <div className="text-xs text-slate-500">添加网站链接</div>
+              <div className="text-3xl mb-1">🌐</div>
+              <div className="font-medium text-xs text-center">网站</div>
             </button>
 
             <button
               onClick={() => handleSelectResourceType('credential')}
-              className="w-full p-4 border border-slate-200 rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-all text-left"
+              className="flex flex-col items-center p-3 border border-slate-200 rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-all"
             >
-              <div className="text-2xl mb-2">🔐</div>
-              <div className="font-medium text-sm">账号密码</div>
-              <div className="text-xs text-slate-500">保存账户凭证（加密）</div>
+              <div className="text-3xl mb-1">🔐</div>
+              <div className="font-medium text-xs text-center">账号密码</div>
             </button>
 
             <button
               onClick={() => handleSelectResourceType('api')}
-              className="w-full p-4 border border-slate-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all text-left"
+              className="flex flex-col items-center p-3 border border-slate-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all"
             >
-              <div className="text-2xl mb-2">🔑</div>
-              <div className="font-medium text-sm">API</div>
-              <div className="text-xs text-slate-500">保存 API 密钥（加密）</div>
+              <div className="text-3xl mb-1">🔑</div>
+              <div className="font-medium text-xs text-center">API</div>
             </button>
           </div>
         </DialogContent>
