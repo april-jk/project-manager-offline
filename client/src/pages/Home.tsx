@@ -3,7 +3,7 @@
  * 
  * 设计理念: 极简紧凑
  * - 项目卡片布局
- * - 高密度网格展示网站
+ * - 高密度网格展示网站、账号密码、API
  * - 简洁的交互和操作
  */
 
@@ -26,8 +26,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Lock, Download, Upload, Trash2, MoreVertical, ExternalLink, X, Settings } from 'lucide-react';
+import { Plus, Lock, Download, Upload, Trash2, MoreVertical, ExternalLink, X, Settings, Key, Lock as LockIcon } from 'lucide-react';
 import { generateRandomColor, downloadFile, readFile } from '@/lib/utils';
 import { exportAllData, importData, clearAllData } from '@/lib/storage';
 
@@ -39,12 +46,14 @@ export default function Home() {
   const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showUnlockDialog, setShowUnlockDialog] = useState(hasPassword && !isPasswordUnlocked);
-  const [showWebsiteDialog, setShowWebsiteDialog] = useState(false);
+  const [showResourceTypeDialog, setShowResourceTypeDialog] = useState(false);
+  const [showResourceDialog, setShowResourceDialog] = useState(false);
   const [showMemoDialog, setShowMemoDialog] = useState(false);
   const [editingProject, setEditingProject] = useState<any>(null);
-  const [editingWebsite, setEditingWebsite] = useState<any>(null);
+  const [editingResource, setEditingResource] = useState<any>(null);
   const [editingMemo, setEditingMemo] = useState<any>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [selectedResourceType, setSelectedResourceType] = useState<'website' | 'credential' | 'api'>('website');
 
   // 表单状态
   const [projectName, setProjectName] = useState('');
@@ -53,11 +62,18 @@ export default function Home() {
   const [password, setPasswordInput] = useState('');
   const [unlockPassword, setUnlockPassword] = useState('');
 
-  const [websiteName, setWebsiteName] = useState('');
-  const [websiteUrl, setWebsiteUrl] = useState('');
-  const [websiteDesc, setWebsiteDesc] = useState('');
-  const [websiteTags, setWebsiteTags] = useState('');
+  // 资源表单状态
+  const [resourceName, setResourceName] = useState('');
+  const [resourceUrl, setResourceUrl] = useState('');
+  const [resourceDesc, setResourceDesc] = useState('');
+  const [resourceTags, setResourceTags] = useState('');
+  const [username, setUsername] = useState('');
+  const [passwordField, setPasswordField] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [apiSecret, setApiSecret] = useState('');
+  const [apiEndpoint, setApiEndpoint] = useState('');
 
+  // 备忘录表单状态
   const [memoTitle, setMemoTitle] = useState('');
   const [memoContent, setMemoContent] = useState('');
   const [memoCategory, setMemoCategory] = useState('');
@@ -120,7 +136,7 @@ export default function Home() {
   };
 
   const handleDeleteProject = (projectId: string) => {
-    if (confirm('确定要删除这个项目吗？这将删除该项目下的所有网站和备忘录。')) {
+    if (confirm('确定要删除这个项目吗？这将删除该项目下的所有资源和备忘录。')) {
       deleteProjectData(projectId);
       if (activeProjectId === projectId) {
         setActiveProjectId(null);
@@ -129,60 +145,108 @@ export default function Home() {
     }
   };
 
-  // ============ 网站操作 ============
+  // ============ 资源操作 ============
 
-  const handleAddWebsite = (projectId: string) => {
+  const handleAddResource = (projectId: string) => {
     setActiveProjectId(projectId);
-    setEditingWebsite(null);
-    setWebsiteName('');
-    setWebsiteUrl('');
-    setWebsiteDesc('');
-    setWebsiteTags('');
-    setShowWebsiteDialog(true);
+    setShowResourceTypeDialog(true);
   };
 
-  const handleEditWebsite = (website: any, projectId: string) => {
-    setActiveProjectId(projectId);
-    setEditingWebsite(website);
-    setWebsiteName(website.name);
-    setWebsiteUrl(website.url);
-    setWebsiteDesc(website.description || '');
-    setWebsiteTags(website.tags?.join(', ') || '');
-    setShowWebsiteDialog(true);
+  const handleSelectResourceType = (type: 'website' | 'credential' | 'api') => {
+    setSelectedResourceType(type);
+    setEditingResource(null);
+    setResourceName('');
+    setResourceUrl('');
+    setResourceDesc('');
+    setResourceTags('');
+    setUsername('');
+    setPasswordField('');
+    setApiKey('');
+    setApiSecret('');
+    setApiEndpoint('');
+    setShowResourceTypeDialog(false);
+    setShowResourceDialog(true);
   };
 
-  const handleSaveWebsite = () => {
+  const handleEditResource = (resource: any, projectId: string) => {
+    setActiveProjectId(projectId);
+    setEditingResource(resource);
+    setSelectedResourceType(resource.type || 'website');
+    setResourceName(resource.name);
+    setResourceUrl(resource.url || '');
+    setResourceDesc(resource.description || '');
+    setResourceTags(resource.tags?.join(', ') || '');
+    setUsername(resource.username || '');
+    setPasswordField(resource.password || '');
+    setApiKey(resource.apiKey || '');
+    setApiSecret(resource.apiSecret || '');
+    setApiEndpoint(resource.apiEndpoint || '');
+    setShowResourceDialog(true);
+  };
+
+  const handleSaveResource = () => {
     if (!activeProjectId) return;
-    if (!websiteName.trim() || !websiteUrl.trim()) {
-      toast.error('请填写网站名称和 URL');
+    if (!resourceName.trim()) {
+      toast.error('请填写资源名称');
       return;
     }
 
-    const tags = websiteTags
+    if (selectedResourceType === 'website' && !resourceUrl.trim()) {
+      toast.error('请填写网站 URL');
+      return;
+    }
+
+    if (selectedResourceType === 'credential' && !username.trim()) {
+      toast.error('请填写用户名');
+      return;
+    }
+
+    if (selectedResourceType === 'api' && !apiKey.trim()) {
+      toast.error('请填写 API Key');
+      return;
+    }
+
+    const tags = resourceTags
       .split(',')
       .map((t) => t.trim())
       .filter((t) => t);
 
-    if (editingWebsite) {
-      updateWebsiteData(editingWebsite.id, {
-        name: websiteName,
-        url: websiteUrl,
-        description: websiteDesc,
-        tags,
-      });
-      toast.success('网站已更新');
-    } else {
-      createWebsite(activeProjectId, websiteName, websiteUrl, websiteDesc, undefined, tags);
-      toast.success('网站已添加');
+    const resourceData: any = {
+      name: resourceName,
+      description: resourceDesc,
+      tags,
+      type: selectedResourceType,
+      isEncrypted: false,
+    };
+
+    if (selectedResourceType === 'website') {
+      resourceData.url = resourceUrl;
+    } else if (selectedResourceType === 'credential') {
+      resourceData.username = username;
+      resourceData.password = passwordField;
+      resourceData.isEncrypted = true;
+    } else if (selectedResourceType === 'api') {
+      resourceData.apiKey = apiKey;
+      resourceData.apiSecret = apiSecret;
+      resourceData.apiEndpoint = apiEndpoint;
+      resourceData.isEncrypted = true;
     }
 
-    setShowWebsiteDialog(false);
+    if (editingResource) {
+      updateWebsiteData(editingResource.id, resourceData);
+      toast.success('资源已更新');
+    } else {
+      createWebsite(activeProjectId, resourceName, resourceUrl, resourceDesc, undefined, tags, selectedResourceType as 'website' | 'credential' | 'api', resourceData);
+      toast.success('资源已添加');
+    }
+
+    setShowResourceDialog(false);
   };
 
-  const handleDeleteWebsite = (websiteId: string) => {
-    if (confirm('确定要删除这个网站吗？')) {
-      deleteWebsiteData(websiteId);
-      toast.success('网站已删除');
+  const handleDeleteResource = (resourceId: string) => {
+    if (confirm('确定要删除这个资源吗？')) {
+      deleteWebsiteData(resourceId);
+      toast.success('资源已删除');
     }
   };
 
@@ -328,6 +392,26 @@ export default function Home() {
     }
   };
 
+  // ============ 辅助函数 ============
+
+  const getResourceIcon = (resource: any) => {
+    if (resource.type === 'credential') {
+      return '🔐';
+    } else if (resource.type === 'api') {
+      return '🔑';
+    }
+    return '🌐';
+  };
+
+  const getResourceColor = (resource: any) => {
+    if (resource.type === 'credential') {
+      return 'group-hover/item:border-amber-200 group-hover/item:bg-amber-50 group-hover/item:text-amber-600';
+    } else if (resource.type === 'api') {
+      return 'group-hover/item:border-purple-200 group-hover/item:bg-purple-50 group-hover/item:text-purple-600';
+    }
+    return 'group-hover/item:border-blue-200 group-hover/item:bg-blue-50 group-hover/item:text-blue-600';
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
       {/* 顶部导航栏 */}
@@ -417,9 +501,9 @@ export default function Home() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleAddWebsite(project.id)}
+                      onClick={() => handleAddResource(project.id)}
                       className="h-5 w-5 p-0 text-slate-400 hover:text-blue-600"
-                      title="添加网站"
+                      title="添加资源"
                     >
                       <Plus size={14} />
                     </Button>
@@ -453,32 +537,54 @@ export default function Home() {
 
                 {/* 高密度网格 */}
                 <div className="p-3 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-x-2 gap-y-4">
-                  {/* 网站卡片 */}
-                  {websites.map((website) => (
-                    <div key={website.id} className="group relative flex flex-col items-center">
-                      <a
-                        href={website.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex flex-col items-center w-full group/item"
-                      >
-                        <div className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-transparent group-hover/item:border-blue-200 group-hover/item:bg-blue-50 group-hover/item:text-blue-600 transition-all mb-1.5 relative">
-                          <span className="text-lg">🌐</span>
-                          <div className="absolute -top-1 -right-1 opacity-0 group-hover/item:opacity-100 bg-blue-600 text-white p-0.5 rounded-full shadow-sm transition-opacity">
-                            <ExternalLink size={8} />
+                  {/* 资源卡片 */}
+                  {websites.map((resource) => (
+                    <div key={resource.id} className="group relative flex flex-col items-center">
+                      {resource.type === 'website' ? (
+                        <a
+                          href={resource.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex flex-col items-center w-full group/item"
+                        >
+                          <div className={`w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-transparent ${getResourceColor(resource)} transition-all mb-1.5 relative`}>
+                            <span className="text-lg">{getResourceIcon(resource)}</span>
+                            <div className="absolute -top-1 -right-1 opacity-0 group-hover/item:opacity-100 bg-blue-600 text-white p-0.5 rounded-full shadow-sm transition-opacity">
+                              <ExternalLink size={8} />
+                            </div>
                           </div>
-                        </div>
-                        <span className="text-xs font-medium text-slate-600 text-center truncate w-full px-1 group-hover/item:text-blue-600">
-                          {website.name}
-                        </span>
-                      </a>
+                          <span className="text-xs font-medium text-slate-600 text-center truncate w-full px-1 group-hover/item:text-blue-600">
+                            {resource.name}
+                          </span>
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => handleEditResource(resource, project.id)}
+                          className="flex flex-col items-center w-full group/item"
+                        >
+                          <div className={`w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-transparent ${getResourceColor(resource)} transition-all mb-1.5 relative`}>
+                            <span className="text-lg">{getResourceIcon(resource)}</span>
+                          </div>
+                          <span className="text-xs font-medium text-slate-600 text-center truncate w-full px-1 group-hover/item:text-slate-800">
+                            {resource.name}
+                          </span>
+                        </button>
+                      )}
 
                       {/* 删除按钮 */}
                       <button
-                        onClick={() => handleDeleteWebsite(website.id)}
+                        onClick={() => handleDeleteResource(resource.id)}
                         className="absolute -top-1 -left-1 hidden group-hover:flex bg-white shadow-md border border-slate-100 rounded-full text-red-400 hover:text-red-600 p-0.5 z-10"
                       >
                         <X size={10} />
+                      </button>
+
+                      {/* 编辑按钮 */}
+                      <button
+                        onClick={() => handleEditResource(resource, project.id)}
+                        className="absolute -top-1 -right-1 hidden group-hover:flex bg-white shadow-md border border-slate-100 rounded-full text-slate-400 hover:text-slate-600 p-0.5 z-10"
+                      >
+                        <Settings size={10} />
                       </button>
                     </div>
                   ))}
@@ -505,12 +611,20 @@ export default function Home() {
                       >
                         <X size={10} />
                       </button>
+
+                      {/* 编辑按钮 */}
+                      <button
+                        onClick={() => handleEditMemo(memo, project.id)}
+                        className="absolute -top-1 -right-1 hidden group-hover:flex bg-white shadow-md border border-slate-100 rounded-full text-slate-400 hover:text-amber-600 p-0.5 z-10"
+                      >
+                        <Settings size={10} />
+                      </button>
                     </div>
                   ))}
 
                   {/* 添加按钮占位符 */}
                   <button
-                    onClick={() => handleAddWebsite(project.id)}
+                    onClick={() => handleAddResource(project.id)}
                     className="flex flex-col items-center group/add"
                   >
                     <div className="w-10 h-10 flex items-center justify-center border border-dashed border-slate-200 rounded-xl text-slate-300 group-hover/add:border-blue-300 group-hover/add:bg-blue-50 group-hover/add:text-blue-400 transition-all mb-1.5">
@@ -561,67 +675,207 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* 网站对话框 */}
-      <Dialog open={showWebsiteDialog} onOpenChange={setShowWebsiteDialog}>
+      {/* 资源类型选择对话框 */}
+      <Dialog open={showResourceTypeDialog} onOpenChange={setShowResourceTypeDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingWebsite ? '编辑网站' : '添加网站'}</DialogTitle>
+            <DialogTitle>选择资源类型</DialogTitle>
+            <DialogDescription>选择您要添加的资源类型</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <button
+              onClick={() => handleSelectResourceType('website')}
+              className="w-full p-4 border border-slate-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all text-left"
+            >
+              <div className="text-2xl mb-2">🌐</div>
+              <div className="font-medium text-sm">网站</div>
+              <div className="text-xs text-slate-500">添加网站链接</div>
+            </button>
+
+            <button
+              onClick={() => handleSelectResourceType('credential')}
+              className="w-full p-4 border border-slate-200 rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-all text-left"
+            >
+              <div className="text-2xl mb-2">🔐</div>
+              <div className="font-medium text-sm">账号密码</div>
+              <div className="text-xs text-slate-500">保存账户凭证（加密）</div>
+            </button>
+
+            <button
+              onClick={() => handleSelectResourceType('api')}
+              className="w-full p-4 border border-slate-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all text-left"
+            >
+              <div className="text-2xl mb-2">🔑</div>
+              <div className="font-medium text-sm">API</div>
+              <div className="text-xs text-slate-500">保存 API 密钥（加密）</div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 资源对话框 */}
+      <Dialog open={showResourceDialog} onOpenChange={setShowResourceDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingResource ? '编辑资源' : '添加资源'}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
               <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
-                网站名称
+                资源名称
               </label>
               <Input
-                value={websiteName}
-                onChange={(e) => setWebsiteName(e.target.value)}
+                value={resourceName}
+                onChange={(e) => setResourceName(e.target.value)}
                 placeholder="例如：GitHub"
                 className="bg-slate-50 border-slate-200"
               />
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
-                网站 URL
-              </label>
-              <Input
-                value={websiteUrl}
-                onChange={(e) => setWebsiteUrl(e.target.value)}
-                placeholder="https://github.com"
-                className="bg-slate-50 border-slate-200"
-              />
-            </div>
+            {selectedResourceType === 'website' && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    网站 URL
+                  </label>
+                  <Input
+                    value={resourceUrl}
+                    onChange={(e) => setResourceUrl(e.target.value)}
+                    placeholder="https://github.com"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
 
-            <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
-                描述
-              </label>
-              <Input
-                value={websiteDesc}
-                onChange={(e) => setWebsiteDesc(e.target.value)}
-                placeholder="网站描述"
-                className="bg-slate-50 border-slate-200"
-              />
-            </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    描述
+                  </label>
+                  <Input
+                    value={resourceDesc}
+                    onChange={(e) => setResourceDesc(e.target.value)}
+                    placeholder="网站描述"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
 
-            <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
-                标签
-              </label>
-              <Input
-                value={websiteTags}
-                onChange={(e) => setWebsiteTags(e.target.value)}
-                placeholder="开发, 工具, 社区"
-                className="bg-slate-50 border-slate-200"
-              />
-            </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    标签
+                  </label>
+                  <Input
+                    value={resourceTags}
+                    onChange={(e) => setResourceTags(e.target.value)}
+                    placeholder="开发, 工具, 社区"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
+              </>
+            )}
+
+            {selectedResourceType === 'credential' && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    用户名
+                  </label>
+                  <Input
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="用户名或邮箱"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    密码
+                  </label>
+                  <Input
+                    type="password"
+                    value={passwordField}
+                    onChange={(e) => setPasswordField(e.target.value)}
+                    placeholder="输入密码"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    描述
+                  </label>
+                  <Input
+                    value={resourceDesc}
+                    onChange={(e) => setResourceDesc(e.target.value)}
+                    placeholder="账户描述（可选）"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
+              </>
+            )}
+
+            {selectedResourceType === 'api' && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    API Key
+                  </label>
+                  <Input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="输入 API Key"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    API Secret（可选）
+                  </label>
+                  <Input
+                    type="password"
+                    value={apiSecret}
+                    onChange={(e) => setApiSecret(e.target.value)}
+                    placeholder="输入 API Secret"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    API 端点（可选）
+                  </label>
+                  <Input
+                    value={apiEndpoint}
+                    onChange={(e) => setApiEndpoint(e.target.value)}
+                    placeholder="https://api.example.com"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    描述
+                  </label>
+                  <Input
+                    value={resourceDesc}
+                    onChange={(e) => setResourceDesc(e.target.value)}
+                    placeholder="API 描述（可选）"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowWebsiteDialog(false)}>
+              <Button variant="outline" onClick={() => setShowResourceDialog(false)}>
                 取消
               </Button>
-              <Button onClick={handleSaveWebsite}>确认</Button>
+              <Button onClick={handleSaveResource}>确认</Button>
             </div>
           </div>
         </DialogContent>

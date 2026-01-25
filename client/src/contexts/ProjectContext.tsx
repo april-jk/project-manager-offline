@@ -47,10 +47,12 @@ interface ProjectContextType {
   createWebsite: (
     projectId: string,
     name: string,
-    url: string,
+    url?: string,
     description?: string,
     icon?: string,
-    tags?: string[]
+    tags?: string[],
+    type?: 'website' | 'credential' | 'api',
+    additionalData?: Partial<Website>
   ) => void;
   updateWebsiteData: (id: string, updates: Partial<Website>) => void;
   deleteWebsiteData: (id: string) => void;
@@ -131,10 +133,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     (
       projectId: string,
       name: string,
-      url: string,
+      url?: string,
       description?: string,
       icon?: string,
-      tags?: string[]
+      tags?: string[],
+      type?: 'website' | 'credential' | 'api',
+      additionalData?: Partial<Website>
     ) => {
       const newWebsite: Website = {
         id: nanoid(),
@@ -145,6 +149,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         icon,
         tags,
         createdAt: Date.now(),
+        type: type || 'website',
+        ...additionalData,
       };
       addWebsite(newWebsite);
       setWebsites((prev) => [...prev, newWebsite]);

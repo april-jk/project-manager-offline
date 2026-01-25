@@ -22,8 +22,8 @@ interface WebsiteCardProps {
 
 export default function WebsiteCard({ website, onEdit, onDelete }: WebsiteCardProps) {
   const [faviconError, setFaviconError] = useState(false);
-  const faviconUrl = getFaviconUrl(website.url);
-  const domain = extractDomain(website.url);
+  const faviconUrl = website.url ? getFaviconUrl(website.url) : undefined;
+  const domain = website.url ? extractDomain(website.url) : 'N/A';
 
   return (
     <Card className="p-4 hover:shadow-md transition-all duration-200 group">
@@ -73,15 +73,17 @@ export default function WebsiteCard({ website, onEdit, onDelete }: WebsiteCardPr
 
       {/* 操作按钮 */}
       <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => window.open(website.url, '_blank')}
-          className="h-8 px-2"
-        >
-          <ExternalLink className="w-4 h-4 mr-1" />
-          打开
-        </Button>
+        {website.url && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.open(website.url, '_blank')}
+            className="h-8 px-2"
+          >
+            <ExternalLink className="w-4 h-4 mr-1" />
+            打开
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

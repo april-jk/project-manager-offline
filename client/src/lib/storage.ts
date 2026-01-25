@@ -23,11 +23,23 @@ export interface Website {
   id: string;
   projectId: string;
   name: string;
-  url: string;
+  url?: string;
   description?: string;
   icon?: string;
   tags?: string[];
   createdAt: number;
+  // 资源类型: 'website' | 'credential' | 'api'
+  type?: 'website' | 'credential' | 'api';
+  // 账号密码类型的字段
+  username?: string;
+  password?: string; // 加密存储
+  // API 类型的字段
+  apiKey?: string; // 加密存储
+  apiSecret?: string; // 加密存储
+  apiEndpoint?: string;
+  apiHeaders?: Record<string, string>;
+  // 加密标记
+  isEncrypted?: boolean;
 }
 
 export interface Memo {
