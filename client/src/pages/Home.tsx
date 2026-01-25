@@ -1,12 +1,12 @@
 /**
- * 首页 - 左侧项目列表 + 右侧内容区
+ * 首页 - 树状导航 + 详情内容
  * 
  * 设计理念: 现代极简主义
- * - 左侧：项目列表导航
- * - 右侧：选中项目的网站黄页和备忘录
+ * - 左侧：树状项目导航（可展开/折叠）
+ * - 右侧：选中项目/网站/备忘录的详情
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '@/contexts/ProjectContext';
 import { useEncryption } from '@/contexts/EncryptionContext';
 import { Button } from '@/components/ui/button';
@@ -26,12 +26,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Settings, Lock, Download, Upload, Trash2, MoreVertical, Edit2, X } from 'lucide-react';
-import ProjectCard from '@/components/ProjectCard';
-import WebsiteCard from '@/components/WebsiteCard';
-import MemoCard from '@/components/MemoCard';
+import { Plus, Lock, Download, Upload, Trash2, MoreVertical, Edit2, ExternalLink } from 'lucide-react';
+import TreeNav from '@/components/TreeNav';
 import { generateRandomColor, downloadFile, readFile } from '@/lib/utils';
 import { exportAllData, importData, clearAllData } from '@/lib/storage';
 
@@ -39,9 +36,9 @@ export default function Home() {
   const { projects, createProject, updateProjectData, deleteProjectData, getProjectWebsites, getProjectMemos, createWebsite, updateWebsiteData, deleteWebsiteData, createMemo, updateMemoData, deleteMemoData } = useProjects();
   const { hasPassword, isPasswordUnlocked, setPassword, unlockWithPassword } = useEncryption();
 
-  // 选中的项目
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  // 选中的节点
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<'project' | 'website' | 'memo' | null>(null);
 
   // 对话框状态
   const [showProjectDialog, setShowProjectDialog] = useState(false);
@@ -70,12 +67,41 @@ export default function Home() {
   const [memoCategory, setMemoCategory] = useState('');
   const [memoEncrypted, setMemoEncrypted] = useState(false);
 
-  // 初始化：选中第一个项目
-  useEffect(() => {
-    if (projects.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(projects[0].id);
+  // 获取选中的对象
+  const selectedProject = projects.find((p) => p.id === selectedId && selectedType === 'project');
+  const allWebsites = useMemo(() => {
+    const result = new Map<string, any[]>();
+    projects.forEach((project) => {
+      result.set(project.id, getProjectWebsites(project.id));
+    });
+    return result;
+  }, [projects, getProjectWebsites]);
+
+  const allMemos = useMemo(() => {
+    const result = new Map<string, any[]>();
+    projects.forEach((project) => {
+      result.set(project.id, getProjectMemos(project.id));
+    });
+    return result;
+  }, [projects, getProjectMemos]);
+
+  const selectedWebsite = useMemo(() => {
+    if (selectedType !== 'website') return null;
+    for (const websites of Array.from(allWebsites.values())) {
+      const website = websites.find((w: any) => w.id === selectedId);
+      if (website) return website;
     }
-  }, [projects, selectedProjectId]);
+    return null;
+  }, [selectedId, selectedType, allWebsites]);
+
+  const selectedMemo = useMemo(() => {
+    if (selectedType !== 'memo') return null;
+    for (const memos of Array.from(allMemos.values())) {
+      const memo = memos.find((m: any) => m.id === selectedId);
+      if (memo) return memo;
+    }
+    return null;
+  }, [selectedId, selectedType, allMemos]);
 
   // ============ 项目操作 ============
 
@@ -87,7 +113,9 @@ export default function Home() {
     setShowProjectDialog(true);
   };
 
-  const handleEditProject = (project: any) => {
+  const handleEditProject = (projectId: string) => {
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
     setEditingProject(project);
     setProjectName(project.name);
     setProjectDesc(project.description || '');
@@ -119,8 +147,9 @@ export default function Home() {
   const handleDeleteProject = (projectId: string) => {
     if (confirm('确定要删除这个项目吗？这将删除该项目下的所有网站和备忘录。')) {
       deleteProjectData(projectId);
-      if (selectedProjectId === projectId) {
-        setSelectedProjectId(projects.length > 1 ? projects[0].id : null);
+      if (selectedId === projectId) {
+        setSelectedId(null);
+        setSelectedType(null);
       }
       toast.success('项目已删除');
     }
@@ -138,7 +167,11 @@ export default function Home() {
     setShowWebsiteDialog(true);
   };
 
-  const handleEditWebsite = (website: any) => {
+  const handleEditWebsite = (websiteId: string) => {
+    const website = Array.from(allWebsites.values())
+      .flat()
+      .find((w) => w.id === websiteId);
+    if (!website) return;
     setEditingWebsite(website);
     setWebsiteName(website.name);
     setWebsiteUrl(website.url);
@@ -178,6 +211,10 @@ export default function Home() {
   const handleDeleteWebsite = (websiteId: string) => {
     if (confirm('确定要删除这个网站吗？')) {
       deleteWebsiteData(websiteId);
+      if (selectedId === websiteId) {
+        setSelectedId(null);
+        setSelectedType(null);
+      }
       toast.success('网站已删除');
     }
   };
@@ -194,7 +231,11 @@ export default function Home() {
     setShowMemoDialog(true);
   };
 
-  const handleEditMemo = (memo: any) => {
+  const handleEditMemo = (memoId: string) => {
+    const memo = Array.from(allMemos.values())
+      .flat()
+      .find((m) => m.id === memoId);
+    if (!memo) return;
     setEditingMemo(memo);
     setMemoTitle(memo.title);
     setMemoContent(memo.content);
@@ -234,6 +275,10 @@ export default function Home() {
   const handleDeleteMemo = (memoId: string) => {
     if (confirm('确定要删除这条备忘录吗？')) {
       deleteMemoData(memoId);
+      if (selectedId === memoId) {
+        setSelectedId(null);
+        setSelectedType(null);
+      }
       toast.success('备忘录已删除');
     }
   };
@@ -323,8 +368,10 @@ export default function Home() {
     }
   };
 
-  const websites = selectedProject ? getProjectWebsites(selectedProject.id) : [];
-  const memos = selectedProject ? getProjectMemos(selectedProject.id) : [];
+  const handleSelectNode = (id: string, type: 'project' | 'website' | 'memo') => {
+    setSelectedId(id);
+    setSelectedType(type);
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -382,96 +429,33 @@ export default function Home() {
 
       {/* 主内容区 */}
       <div className="flex flex-1 overflow-hidden">
-        {/* 左侧项目列表 */}
-        <div className="w-64 border-r border-border bg-background overflow-y-auto flex flex-col">
-          <div className="p-4 border-b border-border">
-            <h2 className="text-sm font-semibold text-foreground">我的项目</h2>
-          </div>
+        {/* 左侧树状导航 */}
+        <TreeNav
+          projects={projects}
+          websites={allWebsites}
+          memos={allMemos}
+          selectedId={selectedId}
+          onSelect={handleSelectNode}
+          onEditProject={handleEditProject}
+          onDeleteProject={handleDeleteProject}
+          onEditWebsite={handleEditWebsite}
+          onDeleteWebsite={handleDeleteWebsite}
+          onEditMemo={handleEditMemo}
+          onDeleteMemo={handleDeleteMemo}
+        />
 
-          {projects.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center p-4">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-4">还没有项目</p>
-                <Button size="sm" onClick={handleAddProject}>
-                  创建项目
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto p-2">
-              <div className="space-y-1">
-                {projects.map((project) => (
-                  <div
-                    key={project.id}
-                    className={`p-3 rounded-md cursor-pointer transition-all duration-200 group ${
-                      selectedProjectId === project.id
-                        ? 'bg-primary/10 border-l-4 border-l-primary'
-                        : 'hover:bg-secondary/50'
-                    }`}
-                    onClick={() => setSelectedProjectId(project.id)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`font-medium text-sm truncate ${
-                          selectedProjectId === project.id
-                            ? 'text-foreground'
-                            : 'text-foreground/80'
-                        }`}>
-                          {project.name}
-                        </h3>
-                        <div className="flex gap-3 text-xs text-muted-foreground mt-2">
-                          <span>📌 {getProjectWebsites(project.id).length}</span>
-                          <span>📝 {getProjectMemos(project.id).length}</span>
-                        </div>
-                      </div>
-
-                      {selectedProjectId === project.id && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditProject(project)}>
-                              <Edit2 className="w-4 h-4 mr-2" />
-                              编辑
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteProject(project.id)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              删除
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 右侧内容区 */}
+        {/* 右侧详情区 */}
         <div className="flex-1 overflow-y-auto">
-          {!selectedProject ? (
+          {!selectedId ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
-                <p className="text-muted-foreground mb-4">请选择或创建一个项目</p>
+                <p className="text-muted-foreground mb-4">请选择项目、网站或备忘录</p>
                 <Button onClick={handleAddProject}>创建项目</Button>
               </div>
             </div>
-          ) : (
+          ) : selectedType === 'project' && selectedProject ? (
+            // 项目详情
             <div className="p-6">
-              {/* 项目标题 */}
               <div className="mb-6">
                 <h1 className="text-3xl font-bold text-foreground">{selectedProject.name}</h1>
                 {selectedProject.description && (
@@ -479,75 +463,124 @@ export default function Home() {
                 )}
               </div>
 
-              {/* 标签页 */}
-              <Tabs defaultValue="websites" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="websites">
-                    📌 网站黄页 ({websites.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="memos">
-                    📝 备忘录 ({memos.length})
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* 网站黄页 */}
-                <TabsContent value="websites" className="space-y-4">
-                  <div className="flex justify-end mb-4">
-                    <Button onClick={handleAddWebsite} className="gap-2">
-                      <Plus className="w-4 h-4" />
-                      添加网站
-                    </Button>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <Card className="p-4">
+                  <div className="text-3xl font-bold text-primary">
+                    {allWebsites.get(selectedProject.id)?.length || 0}
                   </div>
-
-                  {websites.length === 0 ? (
-                    <Card className="p-8 text-center">
-                      <p className="text-muted-foreground mb-4">还没有添加任何网站</p>
-                      <Button onClick={handleAddWebsite}>添加第一个网站</Button>
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {websites.map((website) => (
-                        <WebsiteCard
-                          key={website.id}
-                          website={website}
-                          onEdit={() => handleEditWebsite(website)}
-                          onDelete={() => handleDeleteWebsite(website.id)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* 备忘录 */}
-                <TabsContent value="memos" className="space-y-4">
-                  <div className="flex justify-end mb-4">
-                    <Button onClick={handleAddMemo} className="gap-2">
-                      <Plus className="w-4 h-4" />
-                      添加备忘录
-                    </Button>
+                  <div className="text-sm text-muted-foreground mt-1">网站</div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-3xl font-bold text-primary">
+                    {allMemos.get(selectedProject.id)?.length || 0}
                   </div>
+                  <div className="text-sm text-muted-foreground mt-1">备忘录</div>
+                </Card>
+              </div>
 
-                  {memos.length === 0 ? (
-                    <Card className="p-8 text-center">
-                      <p className="text-muted-foreground mb-4">还没有添加任何备忘录</p>
-                      <Button onClick={handleAddMemo}>添加第一条备忘录</Button>
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {memos.map((memo) => (
-                        <MemoCard
-                          key={memo.id}
-                          memo={memo}
-                          onEdit={() => handleEditMemo(memo)}
-                          onDelete={() => handleDeleteMemo(memo.id)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
+              <div className="flex gap-2">
+                <Button onClick={handleAddWebsite} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  添加网站
+                </Button>
+                <Button onClick={handleAddMemo} variant="outline" className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  添加备忘录
+                </Button>
+              </div>
             </div>
-          )}
+          ) : selectedType === 'website' && selectedWebsite ? (
+            // 网站详情
+            <div className="p-6">
+              <div className="mb-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h1 className="text-3xl font-bold text-foreground">{selectedWebsite.name}</h1>
+                    {selectedWebsite.description && (
+                      <p className="text-muted-foreground mt-2">{selectedWebsite.description}</p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => window.open(selectedWebsite.url, '_blank')}
+                    className="gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    打开网站
+                  </Button>
+                </div>
+              </div>
+
+              <Card className="p-4 mb-6">
+                <div className="text-sm font-medium text-foreground mb-2">URL</div>
+                <div className="text-sm text-muted-foreground break-all font-mono">
+                  {selectedWebsite.url}
+                </div>
+              </Card>
+
+              {selectedWebsite.tags && selectedWebsite.tags.length > 0 && (
+                <Card className="p-4">
+                  <div className="text-sm font-medium text-foreground mb-2">标签</div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedWebsite.tags.map((tag: string) => (
+                      <span
+                        key={tag}
+                        className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-md"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              <div className="flex gap-2 mt-6">
+                <Button onClick={() => handleEditWebsite(selectedWebsite.id)} variant="outline">
+                  编辑
+                </Button>
+                <Button
+                  onClick={() => handleDeleteWebsite(selectedWebsite.id)}
+                  variant="outline"
+                  className="text-destructive"
+                >
+                  删除
+                </Button>
+              </div>
+            </div>
+          ) : selectedType === 'memo' && selectedMemo ? (
+            // 备忘录详情
+            <div className="p-6">
+              <div className="mb-6">
+                <div className="flex items-start justify-between mb-2">
+                  <h1 className="text-3xl font-bold text-foreground">{selectedMemo.title}</h1>
+                  {selectedMemo.isEncrypted && (
+                    <span className="text-lg">🔒</span>
+                  )}
+                </div>
+                {selectedMemo.category && (
+                  <div className="text-sm text-muted-foreground">
+                    分类: {selectedMemo.category}
+                  </div>
+                )}
+              </div>
+
+              <Card className="p-4 mb-6 whitespace-pre-wrap">
+                <div className="text-sm text-foreground">{selectedMemo.content}</div>
+              </Card>
+
+              <div className="flex gap-2">
+                <Button onClick={() => handleEditMemo(selectedMemo.id)} variant="outline">
+                  编辑
+                </Button>
+                <Button
+                  onClick={() => handleDeleteMemo(selectedMemo.id)}
+                  variant="outline"
+                  className="text-destructive"
+                >
+                  删除
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -622,7 +655,7 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle>{editingWebsite ? '编辑网站' : '添加网站'}</DialogTitle>
             <DialogDescription>
-              {editingWebsite ? '修改网站信息' : '添加一个新的网站到黄页'}
+              {editingWebsite ? '修改网站信息' : '添加一个新的网站到项目'}
             </DialogDescription>
           </DialogHeader>
 
