@@ -1,16 +1,16 @@
 /**
- * 首页 - 树状导航 + 详情内容
+ * 首页 - 高密度网格展示
  * 
- * 设计理念: 现代极简主义
- * - 左侧：树状项目导航（可展开/折叠）
- * - 右侧：选中项目/网站/备忘录的详情
+ * 设计理念: 极简紧凑
+ * - 项目卡片布局
+ * - 高密度网格展示网站
+ * - 简洁的交互和操作
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useProjects } from '@/contexts/ProjectContext';
 import { useEncryption } from '@/contexts/EncryptionContext';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -27,18 +27,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { Plus, Lock, Download, Upload, Trash2, MoreVertical, Edit2, ExternalLink } from 'lucide-react';
-import TreeNav from '@/components/TreeNav';
+import { Plus, Lock, Download, Upload, Trash2, MoreVertical, ExternalLink, X, Settings } from 'lucide-react';
 import { generateRandomColor, downloadFile, readFile } from '@/lib/utils';
 import { exportAllData, importData, clearAllData } from '@/lib/storage';
 
 export default function Home() {
   const { projects, createProject, updateProjectData, deleteProjectData, getProjectWebsites, getProjectMemos, createWebsite, updateWebsiteData, deleteWebsiteData, createMemo, updateMemoData, deleteMemoData } = useProjects();
   const { hasPassword, isPasswordUnlocked, setPassword, unlockWithPassword } = useEncryption();
-
-  // 选中的节点
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedType, setSelectedType] = useState<'project' | 'website' | 'memo' | null>(null);
 
   // 对话框状态
   const [showProjectDialog, setShowProjectDialog] = useState(false);
@@ -49,6 +44,7 @@ export default function Home() {
   const [editingProject, setEditingProject] = useState<any>(null);
   const [editingWebsite, setEditingWebsite] = useState<any>(null);
   const [editingMemo, setEditingMemo] = useState<any>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   // 表单状态
   const [projectName, setProjectName] = useState('');
@@ -67,8 +63,7 @@ export default function Home() {
   const [memoCategory, setMemoCategory] = useState('');
   const [memoEncrypted, setMemoEncrypted] = useState(false);
 
-  // 获取选中的对象
-  const selectedProject = projects.find((p) => p.id === selectedId && selectedType === 'project');
+  // 获取所有网站和备忘录
   const allWebsites = useMemo(() => {
     const result = new Map<string, any[]>();
     projects.forEach((project) => {
@@ -85,24 +80,6 @@ export default function Home() {
     return result;
   }, [projects, getProjectMemos]);
 
-  const selectedWebsite = useMemo(() => {
-    if (selectedType !== 'website') return null;
-    for (const websites of Array.from(allWebsites.values())) {
-      const website = websites.find((w: any) => w.id === selectedId);
-      if (website) return website;
-    }
-    return null;
-  }, [selectedId, selectedType, allWebsites]);
-
-  const selectedMemo = useMemo(() => {
-    if (selectedType !== 'memo') return null;
-    for (const memos of Array.from(allMemos.values())) {
-      const memo = memos.find((m: any) => m.id === selectedId);
-      if (memo) return memo;
-    }
-    return null;
-  }, [selectedId, selectedType, allMemos]);
-
   // ============ 项目操作 ============
 
   const handleAddProject = () => {
@@ -113,9 +90,7 @@ export default function Home() {
     setShowProjectDialog(true);
   };
 
-  const handleEditProject = (projectId: string) => {
-    const project = projects.find((p) => p.id === projectId);
-    if (!project) return;
+  const handleEditProject = (project: any) => {
     setEditingProject(project);
     setProjectName(project.name);
     setProjectDesc(project.description || '');
@@ -147,9 +122,8 @@ export default function Home() {
   const handleDeleteProject = (projectId: string) => {
     if (confirm('确定要删除这个项目吗？这将删除该项目下的所有网站和备忘录。')) {
       deleteProjectData(projectId);
-      if (selectedId === projectId) {
-        setSelectedId(null);
-        setSelectedType(null);
+      if (activeProjectId === projectId) {
+        setActiveProjectId(null);
       }
       toast.success('项目已删除');
     }
@@ -157,8 +131,8 @@ export default function Home() {
 
   // ============ 网站操作 ============
 
-  const handleAddWebsite = () => {
-    if (!selectedProject) return;
+  const handleAddWebsite = (projectId: string) => {
+    setActiveProjectId(projectId);
     setEditingWebsite(null);
     setWebsiteName('');
     setWebsiteUrl('');
@@ -167,11 +141,8 @@ export default function Home() {
     setShowWebsiteDialog(true);
   };
 
-  const handleEditWebsite = (websiteId: string) => {
-    const website = Array.from(allWebsites.values())
-      .flat()
-      .find((w) => w.id === websiteId);
-    if (!website) return;
+  const handleEditWebsite = (website: any, projectId: string) => {
+    setActiveProjectId(projectId);
     setEditingWebsite(website);
     setWebsiteName(website.name);
     setWebsiteUrl(website.url);
@@ -181,7 +152,7 @@ export default function Home() {
   };
 
   const handleSaveWebsite = () => {
-    if (!selectedProject) return;
+    if (!activeProjectId) return;
     if (!websiteName.trim() || !websiteUrl.trim()) {
       toast.error('请填写网站名称和 URL');
       return;
@@ -201,7 +172,7 @@ export default function Home() {
       });
       toast.success('网站已更新');
     } else {
-      createWebsite(selectedProject.id, websiteName, websiteUrl, websiteDesc, undefined, tags);
+      createWebsite(activeProjectId, websiteName, websiteUrl, websiteDesc, undefined, tags);
       toast.success('网站已添加');
     }
 
@@ -211,18 +182,14 @@ export default function Home() {
   const handleDeleteWebsite = (websiteId: string) => {
     if (confirm('确定要删除这个网站吗？')) {
       deleteWebsiteData(websiteId);
-      if (selectedId === websiteId) {
-        setSelectedId(null);
-        setSelectedType(null);
-      }
       toast.success('网站已删除');
     }
   };
 
   // ============ 备忘录操作 ============
 
-  const handleAddMemo = () => {
-    if (!selectedProject) return;
+  const handleAddMemo = (projectId: string) => {
+    setActiveProjectId(projectId);
     setEditingMemo(null);
     setMemoTitle('');
     setMemoContent('');
@@ -231,11 +198,8 @@ export default function Home() {
     setShowMemoDialog(true);
   };
 
-  const handleEditMemo = (memoId: string) => {
-    const memo = Array.from(allMemos.values())
-      .flat()
-      .find((m) => m.id === memoId);
-    if (!memo) return;
+  const handleEditMemo = (memo: any, projectId: string) => {
+    setActiveProjectId(projectId);
     setEditingMemo(memo);
     setMemoTitle(memo.title);
     setMemoContent(memo.content);
@@ -245,7 +209,7 @@ export default function Home() {
   };
 
   const handleSaveMemo = () => {
-    if (!selectedProject) return;
+    if (!activeProjectId) return;
     if (!memoTitle.trim()) {
       toast.error('请填写备忘录标题');
       return;
@@ -265,7 +229,7 @@ export default function Home() {
       });
       toast.success('备忘录已更新');
     } else {
-      createMemo(selectedProject.id, memoTitle, memoContent, memoCategory, memoEncrypted);
+      createMemo(activeProjectId, memoTitle, memoContent, memoCategory, memoEncrypted);
       toast.success('备忘录已添加');
     }
 
@@ -275,10 +239,6 @@ export default function Home() {
   const handleDeleteMemo = (memoId: string) => {
     if (confirm('确定要删除这条备忘录吗？')) {
       deleteMemoData(memoId);
-      if (selectedId === memoId) {
-        setSelectedId(null);
-        setSelectedType(null);
-      }
       toast.success('备忘录已删除');
     }
   };
@@ -368,34 +328,34 @@ export default function Home() {
     }
   };
 
-  const handleSelectNode = (id: string, type: 'project' | 'website' | 'memo') => {
-    setSelectedId(id);
-    setSelectedType(type);
-  };
-
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-800">
       {/* 顶部导航栏 */}
-      <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-40">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-foreground">Project Hub</h1>
-
+      <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
+            <div className="bg-blue-600 p-1 rounded-lg">
+              <Settings size={16} className="text-white" />
+            </div>
+            <h1 className="text-base font-bold tracking-tight">Project Hub</h1>
+          </div>
+
+          <div className="flex items-center gap-1">
             {hasPassword && !isPasswordUnlocked && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowUnlockDialog(true)}
-                className="gap-2"
+                className="gap-1 text-xs h-7"
               >
-                <Lock className="w-4 h-4" />
+                <Lock className="w-3 h-3" />
                 解锁
               </Button>
             )}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -419,179 +379,157 @@ export default function Home() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button onClick={handleAddProject} className="gap-2">
-              <Plus className="w-4 h-4" />
-              添加项目
+            <Button onClick={handleAddProject} size="sm" className="gap-1 text-xs h-7">
+              <Plus size={14} />
+              新项目
             </Button>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* 主内容区 */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* 左侧树状导航 */}
-        <TreeNav
-          projects={projects}
-          websites={allWebsites}
-          memos={allMemos}
-          selectedId={selectedId}
-          onSelect={handleSelectNode}
-          onEditProject={handleEditProject}
-          onDeleteProject={handleDeleteProject}
-          onEditWebsite={handleEditWebsite}
-          onDeleteWebsite={handleDeleteWebsite}
-          onEditMemo={handleEditMemo}
-          onDeleteMemo={handleDeleteMemo}
-        />
-
-        {/* 右侧详情区 */}
-        <div className="flex-1 overflow-y-auto">
-          {!selectedId ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-muted-foreground mb-4">请选择项目、网站或备忘录</p>
-                <Button onClick={handleAddProject}>创建项目</Button>
-              </div>
+      {/* 主体内容 */}
+      <main className="max-w-7xl mx-auto px-4 py-3 space-y-3">
+        {projects.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <p className="text-slate-500 mb-4">还没有项目</p>
+              <Button onClick={handleAddProject}>创建第一个项目</Button>
             </div>
-          ) : selectedType === 'project' && selectedProject ? (
-            // 项目详情
-            <div className="p-6">
-              <div className="mb-6">
-                <h1 className="text-3xl font-bold text-foreground">{selectedProject.name}</h1>
-                {selectedProject.description && (
-                  <p className="text-muted-foreground mt-2">{selectedProject.description}</p>
-                )}
-              </div>
+          </div>
+        ) : (
+          projects.map((project) => {
+            const websites = allWebsites.get(project.id) || [];
+            const memos = allMemos.get(project.id) || [];
+            const itemCount = websites.length + memos.length;
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <Card className="p-4">
-                  <div className="text-3xl font-bold text-primary">
-                    {allWebsites.get(selectedProject.id)?.length || 0}
+            return (
+              <div key={project.id} className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                {/* 项目头部 */}
+                <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-3.5 bg-blue-500 rounded-full"></div>
+                    <h2 className="text-sm font-bold text-slate-700">{project.name}</h2>
+                    <span className="text-xs text-slate-400 bg-slate-200/50 px-1.5 py-0.5 rounded uppercase">
+                      {itemCount} Items
+                    </span>
                   </div>
-                  <div className="text-sm text-muted-foreground mt-1">网站</div>
-                </Card>
-                <Card className="p-4">
-                  <div className="text-3xl font-bold text-primary">
-                    {allMemos.get(selectedProject.id)?.length || 0}
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAddWebsite(project.id)}
+                      className="h-5 w-5 p-0 text-slate-400 hover:text-blue-600"
+                      title="添加网站"
+                    >
+                      <Plus size={14} />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 text-slate-300 hover:text-red-500"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditProject(project)}>
+                          编辑项目
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleAddMemo(project.id)}>
+                          添加备忘录
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteProject(project.id)}
+                          className="text-destructive"
+                        >
+                          删除项目
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <div className="text-sm text-muted-foreground mt-1">备忘录</div>
-                </Card>
-              </div>
-
-              <div className="flex gap-2">
-                <Button onClick={handleAddWebsite} className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  添加网站
-                </Button>
-                <Button onClick={handleAddMemo} variant="outline" className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  添加备忘录
-                </Button>
-              </div>
-            </div>
-          ) : selectedType === 'website' && selectedWebsite ? (
-            // 网站详情
-            <div className="p-6">
-              <div className="mb-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h1 className="text-3xl font-bold text-foreground">{selectedWebsite.name}</h1>
-                    {selectedWebsite.description && (
-                      <p className="text-muted-foreground mt-2">{selectedWebsite.description}</p>
-                    )}
-                  </div>
-                  <Button
-                    onClick={() => window.open(selectedWebsite.url, '_blank')}
-                    className="gap-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    打开网站
-                  </Button>
                 </div>
-              </div>
 
-              <Card className="p-4 mb-6">
-                <div className="text-sm font-medium text-foreground mb-2">URL</div>
-                <div className="text-sm text-muted-foreground break-all font-mono">
-                  {selectedWebsite.url}
-                </div>
-              </Card>
-
-              {selectedWebsite.tags && selectedWebsite.tags.length > 0 && (
-                <Card className="p-4">
-                  <div className="text-sm font-medium text-foreground mb-2">标签</div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedWebsite.tags.map((tag: string) => (
-                      <span
-                        key={tag}
-                        className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-md"
+                {/* 高密度网格 */}
+                <div className="p-3 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-x-2 gap-y-4">
+                  {/* 网站卡片 */}
+                  {websites.map((website) => (
+                    <div key={website.id} className="group relative flex flex-col items-center">
+                      <a
+                        href={website.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex flex-col items-center w-full group/item"
                       >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                        <div className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-transparent group-hover/item:border-blue-200 group-hover/item:bg-blue-50 group-hover/item:text-blue-600 transition-all mb-1.5 relative">
+                          <span className="text-lg">🌐</span>
+                          <div className="absolute -top-1 -right-1 opacity-0 group-hover/item:opacity-100 bg-blue-600 text-white p-0.5 rounded-full shadow-sm transition-opacity">
+                            <ExternalLink size={8} />
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium text-slate-600 text-center truncate w-full px-1 group-hover/item:text-blue-600">
+                          {website.name}
+                        </span>
+                      </a>
 
-              <div className="flex gap-2 mt-6">
-                <Button onClick={() => handleEditWebsite(selectedWebsite.id)} variant="outline">
-                  编辑
-                </Button>
-                <Button
-                  onClick={() => handleDeleteWebsite(selectedWebsite.id)}
-                  variant="outline"
-                  className="text-destructive"
-                >
-                  删除
-                </Button>
-              </div>
-            </div>
-          ) : selectedType === 'memo' && selectedMemo ? (
-            // 备忘录详情
-            <div className="p-6">
-              <div className="mb-6">
-                <div className="flex items-start justify-between mb-2">
-                  <h1 className="text-3xl font-bold text-foreground">{selectedMemo.title}</h1>
-                  {selectedMemo.isEncrypted && (
-                    <span className="text-lg">🔒</span>
-                  )}
+                      {/* 删除按钮 */}
+                      <button
+                        onClick={() => handleDeleteWebsite(website.id)}
+                        className="absolute -top-1 -left-1 hidden group-hover:flex bg-white shadow-md border border-slate-100 rounded-full text-red-400 hover:text-red-600 p-0.5 z-10"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* 备忘录卡片 */}
+                  {memos.map((memo) => (
+                    <div key={memo.id} className="group relative flex flex-col items-center">
+                      <button
+                        onClick={() => handleEditMemo(memo, project.id)}
+                        className="flex flex-col items-center w-full group/item"
+                      >
+                        <div className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-transparent group-hover/item:border-amber-200 group-hover/item:bg-amber-50 group-hover/item:text-amber-600 transition-all mb-1.5 relative">
+                          <span className="text-lg">{memo.isEncrypted ? '🔒' : '📝'}</span>
+                        </div>
+                        <span className="text-xs font-medium text-slate-600 text-center truncate w-full px-1 group-hover/item:text-amber-600">
+                          {memo.title}
+                        </span>
+                      </button>
+
+                      {/* 删除按钮 */}
+                      <button
+                        onClick={() => handleDeleteMemo(memo.id)}
+                        className="absolute -top-1 -left-1 hidden group-hover:flex bg-white shadow-md border border-slate-100 rounded-full text-red-400 hover:text-red-600 p-0.5 z-10"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* 添加按钮占位符 */}
+                  <button
+                    onClick={() => handleAddWebsite(project.id)}
+                    className="flex flex-col items-center group/add"
+                  >
+                    <div className="w-10 h-10 flex items-center justify-center border border-dashed border-slate-200 rounded-xl text-slate-300 group-hover/add:border-blue-300 group-hover/add:bg-blue-50 group-hover/add:text-blue-400 transition-all mb-1.5">
+                      <Plus size={18} />
+                    </div>
+                    <span className="text-xs text-slate-300 group-hover/add:text-blue-400">Add</span>
+                  </button>
                 </div>
-                {selectedMemo.category && (
-                  <div className="text-sm text-muted-foreground">
-                    分类: {selectedMemo.category}
-                  </div>
-                )}
               </div>
-
-              <Card className="p-4 mb-6 whitespace-pre-wrap">
-                <div className="text-sm text-foreground">{selectedMemo.content}</div>
-              </Card>
-
-              <div className="flex gap-2">
-                <Button onClick={() => handleEditMemo(selectedMemo.id)} variant="outline">
-                  编辑
-                </Button>
-                <Button
-                  onClick={() => handleDeleteMemo(selectedMemo.id)}
-                  variant="outline"
-                  className="text-destructive"
-                >
-                  删除
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
+            );
+          })
+        )}
+      </main>
 
       {/* 项目对话框 */}
       <Dialog open={showProjectDialog} onOpenChange={setShowProjectDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingProject ? '编辑项目' : '新建项目'}</DialogTitle>
-            <DialogDescription>
-              {editingProject ? '修改项目信息' : '创建一个新项目来组织您的网站和备忘录'}
-            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -600,7 +538,7 @@ export default function Home() {
               <Input
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                placeholder="例如：我的开发工具"
+                placeholder="例如：出海业务 A"
               />
             </div>
 
@@ -611,32 +549,6 @@ export default function Home() {
                 onChange={(e) => setProjectDesc(e.target.value)}
                 placeholder="项目描述（可选）"
               />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">颜色标签</label>
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  '#ef4444',
-                  '#f97316',
-                  '#eab308',
-                  '#22c55e',
-                  '#06b6d4',
-                  '#3b82f6',
-                  '#8b5cf6',
-                  '#ec4899',
-                ].map((color) => (
-                  <button
-                    key={color}
-                    className="w-8 h-8 rounded-lg border-2 transition-all"
-                    style={{
-                      backgroundColor: color,
-                      borderColor: projectColor === color ? '#000' : 'transparent',
-                    }}
-                    onClick={() => setProjectColor(color)}
-                  />
-                ))}
-              </div>
             </div>
 
             <div className="flex gap-2 justify-end">
@@ -654,45 +566,54 @@ export default function Home() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingWebsite ? '编辑网站' : '添加网站'}</DialogTitle>
-            <DialogDescription>
-              {editingWebsite ? '修改网站信息' : '添加一个新的网站到项目'}
-            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">网站名称</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                网站名称
+              </label>
               <Input
                 value={websiteName}
                 onChange={(e) => setWebsiteName(e.target.value)}
                 placeholder="例如：GitHub"
+                className="bg-slate-50 border-slate-200"
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium">网站 URL</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                网站 URL
+              </label>
               <Input
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
                 placeholder="https://github.com"
+                className="bg-slate-50 border-slate-200"
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium">描述</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                描述
+              </label>
               <Input
                 value={websiteDesc}
                 onChange={(e) => setWebsiteDesc(e.target.value)}
                 placeholder="网站描述"
+                className="bg-slate-50 border-slate-200"
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium">标签 (逗号分隔)</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                标签
+              </label>
               <Input
                 value={websiteTags}
                 onChange={(e) => setWebsiteTags(e.target.value)}
                 placeholder="开发, 工具, 社区"
+                className="bg-slate-50 border-slate-200"
               />
             </div>
 
@@ -700,7 +621,7 @@ export default function Home() {
               <Button variant="outline" onClick={() => setShowWebsiteDialog(false)}>
                 取消
               </Button>
-              <Button onClick={handleSaveWebsite}>保存</Button>
+              <Button onClick={handleSaveWebsite}>确认</Button>
             </div>
           </div>
         </DialogContent>
@@ -711,37 +632,43 @@ export default function Home() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingMemo ? '编辑备忘录' : '添加备忘录'}</DialogTitle>
-            <DialogDescription>
-              {editingMemo ? '修改备忘录内容' : '添加一条新的备忘录'}
-            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">标题</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                标题
+              </label>
               <Input
                 value={memoTitle}
                 onChange={(e) => setMemoTitle(e.target.value)}
                 placeholder="备忘录标题"
+                className="bg-slate-50 border-slate-200"
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium">内容</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                内容
+              </label>
               <Textarea
                 value={memoContent}
                 onChange={(e) => setMemoContent(e.target.value)}
                 placeholder="备忘录内容"
                 rows={4}
+                className="bg-slate-50 border-slate-200"
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium">分类</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                分类
+              </label>
               <Input
                 value={memoCategory}
                 onChange={(e) => setMemoCategory(e.target.value)}
                 placeholder="例如：API Key, 密码, 笔记"
+                className="bg-slate-50 border-slate-200"
               />
             </div>
 
@@ -765,7 +692,7 @@ export default function Home() {
               <Button variant="outline" onClick={() => setShowMemoDialog(false)}>
                 取消
               </Button>
-              <Button onClick={handleSaveMemo}>保存</Button>
+              <Button onClick={handleSaveMemo}>确认</Button>
             </div>
           </div>
         </DialogContent>
@@ -776,21 +703,21 @@ export default function Home() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{hasPassword ? '更改密码' : '设置密码'}</DialogTitle>
-            <DialogDescription>
-              设置密码来加密敏感的备忘录和 API Key
-            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">新密码</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                新密码
+              </label>
               <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 placeholder="至少 8 个字符"
+                className="bg-slate-50 border-slate-200"
               />
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-slate-400 mt-2">
                 密码用于加密敏感信息，请妥善保管
               </p>
             </div>
@@ -810,19 +737,19 @@ export default function Home() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>解锁密码保护的内容</DialogTitle>
-            <DialogDescription>
-              请输入密码来访问加密的备忘录
-            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">密码</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                密码
+              </label>
               <Input
                 type="password"
                 value={unlockPassword}
                 onChange={(e) => setUnlockPassword(e.target.value)}
                 placeholder="输入密码"
+                className="bg-slate-50 border-slate-200"
               />
             </div>
 
