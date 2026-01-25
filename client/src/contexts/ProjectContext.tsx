@@ -51,7 +51,7 @@ interface ProjectContextType {
     description?: string,
     icon?: string,
     tags?: string[],
-    type?: 'website' | 'credential' | 'api',
+    type?: 'website' | 'api',
     additionalData?: Partial<Website>
   ) => void;
   updateWebsiteData: (id: string, updates: Partial<Website>) => void;
@@ -137,7 +137,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       description?: string,
       icon?: string,
       tags?: string[],
-      type?: 'website' | 'credential' | 'api',
+      type?: 'website' | 'api',
       additionalData?: Partial<Website>
     ) => {
       const newWebsite: Website = {

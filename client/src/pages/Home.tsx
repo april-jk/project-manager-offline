@@ -55,7 +55,7 @@ export default function Home() {
   const [editingResource, setEditingResource] = useState<any>(null);
   const [editingMemo, setEditingMemo] = useState<any>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [selectedResourceType, setSelectedResourceType] = useState<'website' | 'credential' | 'api'>('website');
+  const [selectedResourceType, setSelectedResourceType] = useState<'website' | 'api'>('website');
 
   // 表单状态
   const [projectName, setProjectName] = useState('');
@@ -154,7 +154,7 @@ export default function Home() {
     setShowResourceTypeDialog(true);
   };
 
-  const handleSelectResourceType = (type: 'website' | 'credential' | 'api') => {
+  const handleSelectResourceType = (type: 'website' | 'api') => {
     setSelectedResourceType(type);
     setEditingResource(null);
     setResourceName('');
@@ -198,11 +198,6 @@ export default function Home() {
       return;
     }
 
-    if (selectedResourceType === 'credential' && !username.trim()) {
-      toast.error('请填写用户名');
-      return;
-    }
-
     if (selectedResourceType === 'api' && !apiKey.trim()) {
       toast.error('请填写 API Key');
       return;
@@ -223,10 +218,11 @@ export default function Home() {
 
     if (selectedResourceType === 'website') {
       resourceData.url = resourceUrl;
-    } else if (selectedResourceType === 'credential') {
       resourceData.username = username;
       resourceData.password = passwordField;
-      resourceData.isEncrypted = true;
+      if (username || passwordField) {
+        resourceData.isEncrypted = true;
+      }
     } else if (selectedResourceType === 'api') {
       resourceData.apiKey = apiKey;
       resourceData.apiSecret = apiSecret;
@@ -238,7 +234,7 @@ export default function Home() {
       updateWebsiteData(editingResource.id, resourceData);
       toast.success('资源已更新');
     } else {
-      createWebsite(activeProjectId, resourceName, resourceUrl, resourceDesc, undefined, tags, selectedResourceType as 'website' | 'credential' | 'api', resourceData);
+      createWebsite(activeProjectId, resourceName, resourceUrl, resourceDesc, undefined, tags, selectedResourceType as 'website' | 'api', resourceData);
       toast.success('资源已添加');
     }
 
@@ -698,14 +694,6 @@ export default function Home() {
             </button>
 
             <button
-              onClick={() => handleSelectResourceType('credential')}
-              className="flex flex-col items-center p-3 border border-slate-200 rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-all"
-            >
-              <div className="text-3xl mb-1">🔐</div>
-              <div className="font-medium text-xs text-center">账号密码</div>
-            </button>
-
-            <button
               onClick={() => handleSelectResourceType('api')}
               className="flex flex-col items-center p-3 border border-slate-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all"
             >
@@ -754,12 +742,25 @@ export default function Home() {
 
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
+                    密码（可选）
+                  </label>
+                  <Input
+                    type="password"
+                    value={passwordField}
+                    onChange={(e) => setPasswordField(e.target.value)}
+                    placeholder="输入密码"
+                    className="bg-slate-50 border-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
                     描述
                   </label>
                   <Input
                     value={resourceDesc}
                     onChange={(e) => setResourceDesc(e.target.value)}
-                    placeholder="网站描述"
+                    placeholder="网站描述（可选）"
                     className="bg-slate-50 border-slate-200"
                   />
                 </div>
@@ -778,46 +779,6 @@ export default function Home() {
               </>
             )}
 
-            {selectedResourceType === 'credential' && (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
-                    用户名
-                  </label>
-                  <Input
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="用户名或邮箱"
-                    className="bg-slate-50 border-slate-200"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
-                    密码
-                  </label>
-                  <Input
-                    type="password"
-                    value={passwordField}
-                    onChange={(e) => setPasswordField(e.target.value)}
-                    placeholder="输入密码"
-                    className="bg-slate-50 border-slate-200"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase ml-1 mb-1 block">
-                    描述
-                  </label>
-                  <Input
-                    value={resourceDesc}
-                    onChange={(e) => setResourceDesc(e.target.value)}
-                    placeholder="账户描述（可选）"
-                    className="bg-slate-50 border-slate-200"
-                  />
-                </div>
-              </>
-            )}
 
             {selectedResourceType === 'api' && (
               <>
@@ -890,21 +851,37 @@ export default function Home() {
             <DialogHeader className="flex-1">
               <DialogTitle>{previewingResource?.name}</DialogTitle>
             </DialogHeader>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setShowResourcePreview(false);
-                setTimeout(() => {
-                  if (activeProjectId) {
-                    handleEditResource(previewingResource, activeProjectId);
-                  }
-                }, 200);
-              }}
-              className="h-8 w-8 p-0"
-            >
-              <Settings size={16} />
-            </Button>
+            <div className="flex gap-2">
+              {previewingResource?.type === 'website' && previewingResource?.url && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    window.open(previewingResource.url, '_blank');
+                  }}
+                  className="h-8 w-8 p-0"
+                  title="访问网站"
+                >
+                  <ExternalLink size={16} />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowResourcePreview(false);
+                  setTimeout(() => {
+                    if (activeProjectId) {
+                      handleEditResource(previewingResource, activeProjectId);
+                    }
+                  }, 200);
+                }}
+                className="h-8 w-8 p-0"
+                title="编辑"
+              >
+                <Settings size={16} />
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -918,6 +895,27 @@ export default function Home() {
                     </a>
                   </div>
                 </div>
+                {previewingResource?.username && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase">用户名</label>
+                    <div className="text-sm text-slate-600 mt-1 break-all">{previewingResource?.username}</div>
+                  </div>
+                )}
+                {previewingResource?.password && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase">密码</label>
+                    <button
+                      onClick={() => {
+                        const newState = { ...previewingResource };
+                        newState.showPassword = !newState.showPassword;
+                        setPreviewingResource(newState);
+                      }}
+                      className="text-sm text-slate-600 mt-1 hover:text-blue-600 cursor-pointer"
+                    >
+                      {previewingResource?.showPassword ? previewingResource?.password : '••••••••'}
+                    </button>
+                  </div>
+                )}
                 {previewingResource?.description && (
                   <div>
                     <label className="text-xs font-semibold text-slate-400 uppercase">描述</label>
@@ -939,24 +937,6 @@ export default function Home() {
               </>
             )}
 
-            {previewingResource?.type === 'credential' && (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">用户名</label>
-                  <div className="text-sm text-slate-600 mt-1 break-all">{previewingResource?.username}</div>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">密码</label>
-                  <div className="text-sm text-slate-600 mt-1">••••••••</div>
-                </div>
-                {previewingResource?.description && (
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 uppercase">描述</label>
-                    <div className="text-sm text-slate-600 mt-1">{previewingResource?.description}</div>
-                  </div>
-                )}
-              </>
-            )}
 
             {previewingResource?.type === 'api' && (
               <>

@@ -28,9 +28,9 @@ export interface Website {
   icon?: string;
   tags?: string[];
   createdAt: number;
-  // 资源类型: 'website' | 'credential' | 'api'
-  type?: 'website' | 'credential' | 'api';
-  // 账号密码类型的字段
+  // 资源类型: 'website' | 'api'
+  type?: 'website' | 'api';
+  // 网站类型的账号密码字段
   username?: string;
   password?: string; // 加密存储
   // API 类型的字段
