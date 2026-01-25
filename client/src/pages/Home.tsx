@@ -48,7 +48,9 @@ export default function Home() {
   const [showUnlockDialog, setShowUnlockDialog] = useState(hasPassword && !isPasswordUnlocked);
   const [showResourceTypeDialog, setShowResourceTypeDialog] = useState(false);
   const [showResourceDialog, setShowResourceDialog] = useState(false);
+  const [showResourcePreview, setShowResourcePreview] = useState(false);
   const [showMemoDialog, setShowMemoDialog] = useState(false);
+  const [previewingResource, setPreviewingResource] = useState<any>(null);
   const [editingProject, setEditingProject] = useState<any>(null);
   const [editingResource, setEditingResource] = useState<any>(null);
   const [editingMemo, setEditingMemo] = useState<any>(null);
@@ -559,7 +561,11 @@ export default function Home() {
                         </a>
                       ) : (
                         <button
-                          onClick={() => handleEditResource(resource, project.id)}
+                          onClick={() => {
+                            setPreviewingResource(resource);
+                            setActiveProjectId(project.id);
+                            setShowResourcePreview(true);
+                          }}
                           className="flex flex-col items-center w-full group/item"
                         >
                           <div className={`w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-transparent ${getResourceColor(resource)} transition-all mb-1.5 relative`}>
@@ -872,6 +878,117 @@ export default function Home() {
                 取消
               </Button>
               <Button onClick={handleSaveResource}>确认</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 资源预览对话框 */}
+      <Dialog open={showResourcePreview} onOpenChange={setShowResourcePreview}>
+        <DialogContent className="max-w-md">
+          <div className="flex items-center justify-between">
+            <DialogHeader className="flex-1">
+              <DialogTitle>{previewingResource?.name}</DialogTitle>
+            </DialogHeader>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowResourcePreview(false);
+                setTimeout(() => {
+                  if (activeProjectId) {
+                    handleEditResource(previewingResource, activeProjectId);
+                  }
+                }, 200);
+              }}
+              className="h-8 w-8 p-0"
+            >
+              <Settings size={16} />
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            {previewingResource?.type === 'website' && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase">URL</label>
+                  <div className="text-sm text-slate-600 break-all mt-1">
+                    <a href={previewingResource?.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      {previewingResource?.url}
+                    </a>
+                  </div>
+                </div>
+                {previewingResource?.description && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase">描述</label>
+                    <div className="text-sm text-slate-600 mt-1">{previewingResource?.description}</div>
+                  </div>
+                )}
+                {previewingResource?.tags && previewingResource?.tags.length > 0 && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase">标签</label>
+                    <div className="flex gap-1 flex-wrap mt-1">
+                      {previewingResource?.tags.map((tag: string) => (
+                        <span key={tag} className="inline-block px-2 py-1 text-xs bg-slate-100 text-slate-600 rounded">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {previewingResource?.type === 'credential' && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase">用户名</label>
+                  <div className="text-sm text-slate-600 mt-1 break-all">{previewingResource?.username}</div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase">密码</label>
+                  <div className="text-sm text-slate-600 mt-1">••••••••</div>
+                </div>
+                {previewingResource?.description && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase">描述</label>
+                    <div className="text-sm text-slate-600 mt-1">{previewingResource?.description}</div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {previewingResource?.type === 'api' && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase">API Key</label>
+                  <div className="text-sm text-slate-600 mt-1">••••••••</div>
+                </div>
+                {previewingResource?.apiSecret && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase">API Secret</label>
+                    <div className="text-sm text-slate-600 mt-1">••••••••</div>
+                  </div>
+                )}
+                {previewingResource?.apiEndpoint && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase">API 端点</label>
+                    <div className="text-sm text-slate-600 mt-1 break-all">{previewingResource?.apiEndpoint}</div>
+                  </div>
+                )}
+                {previewingResource?.description && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase">描述</label>
+                    <div className="text-sm text-slate-600 mt-1">{previewingResource?.description}</div>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" onClick={() => setShowResourcePreview(false)}>
+                关闭
+              </Button>
             </div>
           </div>
         </DialogContent>
