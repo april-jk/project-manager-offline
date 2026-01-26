@@ -1,8 +1,13 @@
 {
   "name": "project-manager-offline",
+  "description": "An offline project management tool for managing websites, APIs, and credentials with encryption",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "author": {
+    "name": "Project Hub",
+    "email": "noreply@projecthub.local"
+  },
   "scripts": {
     "dev": "vite --host",
     "dev:electron": "concurrently \"pnpm dev\" \"wait-on http://localhost:3000 && electron .\"",
@@ -137,7 +142,8 @@
         "deb"
       ],
       "icon": "assets/icon.png",
-      "category": "Productivity"
+      "category": "Productivity",
+      "maintainer": "Project Hub <noreply@projecthub.local>"
     },
     "publish": {
       "provider": "github",
