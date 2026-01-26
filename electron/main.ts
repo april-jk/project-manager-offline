@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import path from 'path';
+import * as path from 'path';
 import isDev from 'electron-is-dev';
 import { setupAutoUpdater } from './updater';
 
@@ -17,7 +17,6 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.ts'),
       nodeIntegration: false,
       contextIsolation: true,
-      enableRemoteModule: false,
     },
     icon: path.join(__dirname, '../assets/icon.png'),
   });

@@ -1,5 +1,6 @@
 import { autoUpdater } from 'electron-updater';
 import { BrowserWindow, dialog } from 'electron';
+import * as path from 'path';
 
 export function setupAutoUpdater(mainWindow: BrowserWindow | null) {
   // 配置自动更新
