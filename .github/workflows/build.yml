@@ -2,8 +2,8 @@ name: Build and Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -12,16 +12,6 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-            artifact: dist/Project Hub-*.AppImage
-            artifact_name: Project Hub.AppImage
-          - os: windows-latest
-            artifact: dist/Project Hub Setup *.exe
-            artifact_name: Project Hub Setup.exe
-          - os: macos-latest
-            artifact: dist/Project Hub-*.dmg
-            artifact_name: Project Hub.dmg
 
     steps:
       - uses: actions/checkout@v4
@@ -63,44 +53,114 @@ jobs:
         with:
           name: ${{ matrix.os }}-build
           path: dist/
+          retention-days: 7
 
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/Project Hub-*.AppImage
-            dist/Project Hub Setup *.exe
-            dist/Project Hub-*.dmg
-            dist/*.exe
-            dist/*.deb
-            dist/*.zip
-            dist/*.yml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  publish-release:
+  create-release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+      
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Release Tag
+        id: tag
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          TAG="v$(date +%Y.%m.%d)-${COMMIT_SHA}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "commit_msg=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
 
       - name: Download all artifacts
         uses: actions/download-artifact@v3
 
+      - name: Prepare Release Files
+        run: |
+          mkdir -p release_files
+          
+          # Copy Linux artifacts
+          if [ -d "ubuntu-latest-build/dist" ]; then
+            cp ubuntu-latest-build/dist/*.AppImage release_files/ 2>/dev/null || true
+            cp ubuntu-latest-build/dist/*.deb release_files/ 2>/dev/null || true
+            cp ubuntu-latest-build/dist/*.yml release_files/ 2>/dev/null || true
+          fi
+          
+          # Copy Windows artifacts
+          if [ -d "windows-latest-build/dist" ]; then
+            cp windows-latest-build/dist/*.exe release_files/ 2>/dev/null || true
+          fi
+          
+          # Copy macOS artifacts
+          if [ -d "macos-latest-build/dist" ]; then
+            cp macos-latest-build/dist/*.dmg release_files/ 2>/dev/null || true
+            cp macos-latest-build/dist/*.zip release_files/ 2>/dev/null || true
+          fi
+          
+          ls -la release_files/
+
       - name: Create Release Notes
         run: |
-          echo "## Release Notes" > release_notes.md
-          echo "" >> release_notes.md
-          echo "### Changes" >> release_notes.md
-          echo "- See commit history for details" >> release_notes.md
+          cat > release_notes.md << 'EOF'
+          ## 🚀 Project Hub Release
+          
+          **Build Time**: ${{ steps.tag.outputs.timestamp }}
+          **Commit**: ${{ steps.tag.outputs.commit_msg }}
+          
+          ### 📦 Available Downloads
+          
+          - **Windows**: Project Hub Setup .exe (NSIS Installer)
+          - **Windows**: Project Hub .exe (Portable)
+          - **macOS**: Project Hub .dmg (DMG Installer)
+          - **macOS**: Project Hub .zip (Archive)
+          - **Linux**: Project Hub .AppImage (Universal)
+          - **Linux**: project-hub .deb (Debian/Ubuntu)
+          
+          ### ✨ Features
+          
+          - 📁 Project management system
+          - 🌐 Website and API resource management
+          - 🔐 Encrypted credential storage (AES-256-GCM)
+          - 💾 Local storage (no server required)
+          - 🔄 Auto-update support
+          - 📱 Cross-platform support (Windows, macOS, Linux)
+          
+          ### 🔒 Security
+          
+          - Military-grade AES-256-GCM encryption
+          - PBKDF2 key derivation (100,000 iterations)
+          - All data stored locally
+          - No data collection
+          
+          ---
+          
+          **Installation Instructions**:
+          - **Windows**: Download .exe and run the installer
+          - **macOS**: Download .dmg and drag the app to Applications
+          - **Linux**: Download .AppImage and make it executable, or install .deb package
+          
+          For detailed information, visit the [Project Hub Repository](https://github.com/april-jk/project-manager-offline)
+          EOF
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.tag.outputs.tag }}
           body_path: release_notes.md
           draft: false
           prerelease: false
+          files: release_files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete old releases
+        uses: dev-drprasad/delete-older-releases@v0.2.1
+        with:
+          keep_latest: 10
+          delete_prerelease_only: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
