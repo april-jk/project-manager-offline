@@ -1,0 +1,158 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build:electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.os }}-build
+          path: dist/
+          retention-days: 7
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Release Tag
+        id: tag
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          TAG="v$(date +%Y.%m.%d)-${COMMIT_SHA}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "commit_msg=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Prepare Release Files
+        run: |
+          mkdir -p release_files
+          
+          if [ -d "ubuntu-latest-build/dist" ]; then
+            cp ubuntu-latest-build/dist/*.AppImage release_files/ 2>/dev/null || true
+            cp ubuntu-latest-build/dist/*.deb release_files/ 2>/dev/null || true
+            cp ubuntu-latest-build/dist/*.yml release_files/ 2>/dev/null || true
+          fi
+          
+          if [ -d "windows-latest-build/dist" ]; then
+            cp windows-latest-build/dist/*.exe release_files/ 2>/dev/null || true
+          fi
+          
+          if [ -d "macos-latest-build/dist" ]; then
+            cp macos-latest-build/dist/*.dmg release_files/ 2>/dev/null || true
+            cp macos-latest-build/dist/*.zip release_files/ 2>/dev/null || true
+          fi
+          
+          ls -la release_files/
+
+      - name: Create Release Notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## 🚀 Project Hub Release
+          
+          **Build Time**: ${{ steps.tag.outputs.timestamp }}
+          **Commit**: ${{ steps.tag.outputs.commit_msg }}
+          
+          ### 📦 Available Downloads
+          
+          - **Windows**: Project Hub Setup .exe (NSIS Installer)
+          - **Windows**: Project Hub .exe (Portable)
+          - **macOS**: Project Hub .dmg (DMG Installer)
+          - **macOS**: Project Hub .zip (Archive)
+          - **Linux**: Project Hub .AppImage (Universal)
+          - **Linux**: project-hub .deb (Debian/Ubuntu)
+          
+          ### ✨ Features
+          
+          - 📁 Project management system
+          - 🌐 Website and API resource management
+          - 🔐 Encrypted credential storage (AES-256-GCM)
+          - 💾 Local storage (no server required)
+          - 🔄 Auto-update support
+          - 📱 Cross-platform support (Windows, macOS, Linux)
+          
+          ### 🔒 Security
+          
+          - Military-grade AES-256-GCM encryption
+          - PBKDF2 key derivation (100,000 iterations)
+          - All data stored locally
+          - No data collection
+          
+          ---
+          
+          For detailed information, visit the [Project Hub Repository](https://github.com/april-jk/project-manager-offline )
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: release_files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete old releases
+        uses: dev-drprasad/delete-older-releases@v0.2.1
+        with:
+          keep_latest: 10
+          delete_prerelease_only: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
