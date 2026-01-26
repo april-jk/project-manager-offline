@@ -43,7 +43,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-
       - name: Build application
         run: pnpm build:electron
         env:
@@ -78,30 +77,33 @@ jobs:
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
           echo "commit_msg=${COMMIT_MSG}" >> $GITHUB_OUTPUT
 
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+
+      - name: Debug - List downloaded artifacts
+        run: |
+          echo "=== Directory structure ==="
+          find . -type d -name "*build" | head -10
+          echo ""
+          echo "=== All files in artifacts ==="
+          find . -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.yml" \) | head -30
 
       - name: Prepare Release Files
         run: |
           mkdir -p release_files
           
-          if [ -d "ubuntu-latest-build/dist" ]; then
-            cp ubuntu-latest-build/dist/*.AppImage release_files/ 2>/dev/null || true
-            cp ubuntu-latest-build/dist/*.deb release_files/ 2>/dev/null || true
-            cp ubuntu-latest-build/dist/*.yml release_files/ 2>/dev/null || true
-          fi
+          echo "=== Copying Linux files ==="
+          find ubuntu-latest-build -type f \( -name "*.AppImage" -o -name "*.deb" \) -exec cp -v {} release_files/ \; 2>/dev/null || echo "No Linux files found"
           
-          if [ -d "windows-latest-build/dist" ]; then
-            cp windows-latest-build/dist/*.exe release_files/ 2>/dev/null || true
-          fi
+          echo "=== Copying Windows files ==="
+          find windows-latest-build -type f -name "*.exe" -exec cp -v {} release_files/ \; 2>/dev/null || echo "No Windows files found"
           
-          if [ -d "macos-latest-build/dist" ]; then
-            cp macos-latest-build/dist/*.dmg release_files/ 2>/dev/null || true
-            cp macos-latest-build/dist/*.zip release_files/ 2>/dev/null || true
-          fi
+          echo "=== Copying macOS files ==="
+          find macos-latest-build -type f \( -name "*.dmg" -o -name "*.zip" \) -exec cp -v {} release_files/ \; 2>/dev/null || echo "No macOS files found"
           
-          ls -la release_files/
+          echo ""
+          echo "=== Final release files ==="
+          ls -lah release_files/ || echo "No files in release_files"
 
       - name: Create Release Notes
         run: |
@@ -138,7 +140,7 @@ jobs:
           
           ---
           
-          For detailed information, visit the [Project Hub Repository](https://github.com/april-jk/project-manager-offline )
+          For detailed information, visit the [Project Hub Repository](https://github.com/april-jk/project-manager-offline)
           EOF
 
       - name: Create GitHub Release
