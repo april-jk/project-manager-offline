@@ -17,11 +17,30 @@ interface MemoCardProps {
   memo: Memo;
   onEdit: () => void;
   onDelete: () => void;
+  selected?: boolean;
+  onSelect?: (checked: boolean) => void;
 }
 
-export default function MemoCard({ memo, onEdit, onDelete }: MemoCardProps) {
+export default function MemoCard({ memo, onEdit, onDelete, selected, onSelect }: MemoCardProps) {
   return (
-    <Card className="p-4 hover:shadow-md transition-all duration-200 group cursor-pointer" onClick={onEdit}>
+    <Card
+      className="p-4 hover:shadow-md transition-all duration-200 group cursor-pointer relative"
+      onClick={() => {
+        if (onSelect) return;
+        onEdit();
+      }}
+    >
+      {onSelect && (
+        <input
+          type="checkbox"
+          className="absolute top-3 right-3 w-4 h-4"
+          checked={!!selected}
+          onChange={(e) => {
+            e.stopPropagation();
+            onSelect(e.target.checked);
+          }}
+        />
+      )}
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
           <h3 className="font-semibold text-foreground truncate">{memo.title}</h3>
@@ -37,7 +56,7 @@ export default function MemoCard({ memo, onEdit, onDelete }: MemoCardProps) {
       </div>
 
       <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-        {memo.isEncrypted ? '🔒 加密内容' : truncateText(memo.content, 100)}
+        {memo.isEncrypted ? '加密内容' : truncateText(memo.content, 100)}
       </p>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">

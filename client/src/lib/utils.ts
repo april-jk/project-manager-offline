@@ -74,6 +74,26 @@ export function isValidUrl(url: string): boolean {
   }
 }
 
+export function parseUrlInput(value: string, currentProtocol: 'http' | 'https'): { protocol: 'http' | 'https'; url: string } {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('http://')) {
+    return { protocol: 'http', url: trimmed.slice(7) };
+  }
+  if (trimmed.startsWith('https://')) {
+    return { protocol: 'https', url: trimmed.slice(8) };
+  }
+  return { protocol: currentProtocol, url: value };
+}
+
+export function buildUrlWithProtocol(protocol: 'http' | 'https', value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return `${protocol}://${trimmed}`;
+}
+
 /**
  * 从 URL 提取域名
  */
@@ -95,6 +115,27 @@ export function getFaviconUrl(url: string): string {
     return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
   } catch {
     return '';
+  }
+}
+
+/**
+ * 尝试获取图片并转为 Data URL，用于离线缓存图标
+ */
+export async function fetchImageAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, { mode: 'cors' });
+    if (!response.ok) {
+      return null;
+    }
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
   }
 }
 

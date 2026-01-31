@@ -1,10 +1,12 @@
 import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
+import * as fs from 'fs';
 import isDev from 'electron-is-dev';
 import { setupAutoUpdater } from './updater';
 
 let mainWindow: BrowserWindow | null = null;
+let storageDir: string = '';
 
 // 创建主窗口
 function createWindow() {
@@ -17,6 +19,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.ts'),
       nodeIntegration: false,
       contextIsolation: true,
+      webviewTag: true,
     },
     icon: path.join(__dirname, '../assets/icon.png'),
   });
@@ -45,6 +48,10 @@ app.on('ready', () => {
   if (!isDev) {
     setupAutoUpdater(mainWindow);
   }
+  storageDir = path.join(app.getPath('userData'), 'ProjectHub');
+  try {
+    fs.mkdirSync(storageDir, { recursive: true });
+  } catch {}
 });
 
 // 所有窗口关闭时退出应用
@@ -114,6 +121,46 @@ function createMenu() {
 // IPC 事件处理
 ipcMain.on('app-version', (event) => {
   event.reply('app-version', { version: app.getVersion() });
+});
+
+ipcMain.on('storage:dirPath', (event) => {
+  event.returnValue = storageDir;
+});
+
+ipcMain.on('storage:getSync', (event, key: string) => {
+  try {
+    const file = path.join(storageDir, `${key}.json`);
+    if (!fs.existsSync(file)) {
+      event.returnValue = null;
+      return;
+    }
+    const content = fs.readFileSync(file, 'utf-8');
+    event.returnValue = JSON.parse(content);
+  } catch {
+    event.returnValue = null;
+  }
+});
+
+ipcMain.on('storage:setSync', (event, payload: { key: string; data: unknown }) => {
+  try {
+    const file = path.join(storageDir, `${payload.key}.json`);
+    fs.writeFileSync(file, JSON.stringify(payload.data));
+    event.returnValue = true;
+  } catch {
+    event.returnValue = false;
+  }
+});
+
+ipcMain.on('storage:removeSync', (event, key: string) => {
+  try {
+    const file = path.join(storageDir, `${key}.json`);
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+    }
+    event.returnValue = true;
+  } catch {
+    event.returnValue = false;
+  }
 });
 
 // 自动更新事件

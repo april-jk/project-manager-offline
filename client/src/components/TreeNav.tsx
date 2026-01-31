@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronRight, ChevronDown, FolderOpen, Globe, FileText, MoreVertical } from 'lucide-react';
+import { ChevronRight, ChevronDown, FolderOpen, Globe, FileText, MoreVertical, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -227,7 +227,7 @@ export default function TreeNav({
                               {memo.title}
                             </span>
                             {memo.isEncrypted && (
-                              <span className="text-xs flex-shrink-0">🔒</span>
+                              <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                             )}
                             {isMemoSelected && (
                               <DropdownMenu>

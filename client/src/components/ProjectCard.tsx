@@ -10,12 +10,12 @@
 import { Project } from '@/lib/storage';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trash2, Edit2, ChevronRight } from 'lucide-react';
+import { Trash2, Edit2, ChevronRight, Link2, StickyNote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProjectCardProps {
   project: Project;
-  websiteCount: number;
+  resourceCount: number;
   memoCount: number;
   onSelect: () => void;
   onEdit: () => void;
@@ -24,7 +24,7 @@ interface ProjectCardProps {
 
 export default function ProjectCard({
   project,
-  websiteCount,
+  resourceCount,
   memoCount,
   onSelect,
   onEdit,
@@ -53,8 +53,14 @@ export default function ProjectCard({
       </div>
 
       <div className="flex gap-4 text-sm text-muted-foreground mb-4">
-        <span>📌 {websiteCount} 个网站</span>
-        <span>📝 {memoCount} 条备忘</span>
+        <span className="inline-flex items-center gap-1">
+          <Link2 className="w-4 h-4" />
+          {resourceCount} 个资源
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <StickyNote className="w-4 h-4" />
+          {memoCount} 条备忘
+        </span>
       </div>
 
       <div className="flex gap-2 justify-end">

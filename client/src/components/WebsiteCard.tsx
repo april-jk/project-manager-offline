@@ -7,30 +7,55 @@
  * - 标签展示
  */
 
-import { Website } from '@/lib/storage';
+import { Resource } from '@/lib/storage';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Edit2, Trash2 } from 'lucide-react';
+import { ExternalLink, Edit2, Trash2, Globe, Link2, Key, Code2, Activity, FileText } from 'lucide-react';
 import { extractDomain, getFaviconUrl } from '@/lib/utils';
 import { useState } from 'react';
 
 interface WebsiteCardProps {
-  website: Website;
+  website: Resource;
   onEdit: () => void;
   onDelete: () => void;
+  selected?: boolean;
+  onSelect?: (checked: boolean) => void;
 }
 
-export default function WebsiteCard({ website, onEdit, onDelete }: WebsiteCardProps) {
+export default function WebsiteCard({
+  website,
+  onEdit,
+  onDelete,
+  selected,
+  onSelect,
+}: WebsiteCardProps) {
   const [faviconError, setFaviconError] = useState(false);
-  const faviconUrl = website.url ? getFaviconUrl(website.url) : undefined;
+  const faviconUrl = website.icon || (website.url ? getFaviconUrl(website.url) : undefined);
   const domain = website.url ? extractDomain(website.url) : 'N/A';
 
   return (
-    <Card className="p-4 hover:shadow-md transition-all duration-200 group">
+    <Card className="p-4 hover:shadow-md transition-all duration-200 group relative">
+      {onSelect && (
+        <input
+          type="checkbox"
+          className="absolute top-3 right-3 w-4 h-4"
+          checked={!!selected}
+          onChange={(e) => onSelect(e.target.checked)}
+        />
+      )}
       <div className="flex gap-3 mb-3">
         {/* 网站图标 */}
         <div className="flex-shrink-0 w-12 h-12 bg-secondary rounded-lg flex items-center justify-center overflow-hidden">
-          {!faviconError && faviconUrl ? (
+          {website.iconType === 'builtin' && website.iconName ? (
+            <>
+              {website.iconName === 'globe' && <Globe className="w-6 h-6 text-muted-foreground" />}
+              {website.iconName === 'link' && <Link2 className="w-6 h-6 text-muted-foreground" />}
+              {website.iconName === 'key' && <Key className="w-6 h-6 text-muted-foreground" />}
+              {website.iconName === 'code' && <Code2 className="w-6 h-6 text-muted-foreground" />}
+              {website.iconName === 'activity' && <Activity className="w-6 h-6 text-muted-foreground" />}
+              {website.iconName === 'file' && <FileText className="w-6 h-6 text-muted-foreground" />}
+            </>
+          ) : !faviconError && faviconUrl ? (
             <img
               src={faviconUrl}
               alt={website.name}
@@ -38,7 +63,7 @@ export default function WebsiteCard({ website, onEdit, onDelete }: WebsiteCardPr
               onError={() => setFaviconError(true)}
             />
           ) : (
-            <span className="text-lg">🌐</span>
+            <Globe className="w-6 h-6 text-muted-foreground" />
           )}
         </div>
 

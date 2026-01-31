@@ -7,7 +7,7 @@
  * - 支持密码验证和重置
  */
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import {
   encryptText,
   decryptText,
@@ -21,12 +21,15 @@ interface EncryptionContextType {
   // 密码状态
   hasPassword: boolean;
   isPasswordUnlocked: boolean;
+  autoLockMinutes: number;
 
   // 密码操作
   setPassword: (password: string) => Promise<void>;
   unlockWithPassword: (password: string) => Promise<boolean>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   clearPassword: () => void;
+  lockPassword: () => void;
+  updateAutoLockMinutes: (minutes: number) => Promise<void>;
 
   // 加密/解密操作
   encrypt: (plaintext: string) => Promise<EncryptedData>;
@@ -36,20 +39,20 @@ interface EncryptionContextType {
 const EncryptionContext = createContext<EncryptionContextType | undefined>(undefined);
 
 export function EncryptionProvider({ children }: { children: React.ReactNode }) {
-  const [hasPassword, setHasPassword] = useState(() => {
-    const settings = getSettings();
-    return settings.hasPassword || false;
-  });
+  const [hasPassword, setHasPassword] = useState(false);
+  const [autoLockMinutes, setAutoLockMinutes] = useState(15);
 
-  const [isPasswordUnlocked, setIsPasswordUnlocked] = useState(!hasPassword);
+  const [isPasswordUnlocked, setIsPasswordUnlocked] = useState(false);
   const [currentPassword, setCurrentPassword] = useState<string | null>(null);
+  const lastActiveRef = useRef<number>(Date.now());
+  const lockTimerRef = useRef<number | null>(null);
 
   // ============ 密码操作 ============
 
   const setPassword = useCallback(async (password: string) => {
     try {
       const verificationData = await generatePasswordVerificationData(password);
-      updateSettings({
+      await updateSettings({
         hasPassword: true,
         passwordVerificationData: verificationData,
       });
@@ -64,7 +67,7 @@ export function EncryptionProvider({ children }: { children: React.ReactNode }) 
 
   const unlockWithPassword = useCallback(async (password: string) => {
     try {
-      const settings = getSettings();
+      const settings = await getSettings();
       if (!settings.passwordVerificationData) {
         throw new Error('没有设置密码');
       }
@@ -107,13 +110,24 @@ export function EncryptionProvider({ children }: { children: React.ReactNode }) 
   );
 
   const clearPassword = useCallback(() => {
-    updateSettings({
+    void updateSettings({
       hasPassword: false,
       passwordVerificationData: undefined,
     });
     setHasPassword(false);
     setCurrentPassword(null);
     setIsPasswordUnlocked(true);
+  }, []);
+
+  const lockPassword = useCallback(() => {
+    setCurrentPassword(null);
+    setIsPasswordUnlocked(false);
+  }, []);
+
+  const updateAutoLockMinutes = useCallback(async (minutes: number) => {
+    const safeMinutes = Math.max(5, Math.min(240, minutes));
+    await updateSettings({ autoLockMinutes: safeMinutes });
+    setAutoLockMinutes(safeMinutes);
   }, []);
 
   // ============ 加密/解密操作 ============
@@ -141,13 +155,59 @@ export function EncryptionProvider({ children }: { children: React.ReactNode }) 
   const value: EncryptionContextType = {
     hasPassword,
     isPasswordUnlocked,
+    autoLockMinutes,
     setPassword,
     unlockWithPassword,
     changePassword,
     clearPassword,
+    lockPassword,
+    updateAutoLockMinutes,
     encrypt,
     decrypt,
   };
+
+  useEffect(() => {
+    const load = async () => {
+      const settings = await getSettings();
+      const hasPwd = settings.hasPassword || false;
+      setHasPassword(hasPwd);
+      setIsPasswordUnlocked(!hasPwd);
+      setAutoLockMinutes(settings.autoLockMinutes ?? 15);
+    };
+    void load();
+  }, []);
+
+  useEffect(() => {
+    if (!hasPassword || !isPasswordUnlocked) {
+      if (lockTimerRef.current) {
+        window.clearInterval(lockTimerRef.current);
+        lockTimerRef.current = null;
+      }
+      return;
+    }
+
+    const handleActivity = () => {
+      lastActiveRef.current = Date.now();
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'click', 'scroll'];
+    activityEvents.forEach((event) => window.addEventListener(event, handleActivity));
+
+    lockTimerRef.current = window.setInterval(() => {
+      const inactiveMs = Date.now() - lastActiveRef.current;
+      if (inactiveMs > autoLockMinutes * 60 * 1000) {
+        lockPassword();
+      }
+    }, 30 * 1000);
+
+    return () => {
+      activityEvents.forEach((event) => window.removeEventListener(event, handleActivity));
+      if (lockTimerRef.current) {
+        window.clearInterval(lockTimerRef.current);
+        lockTimerRef.current = null;
+      }
+    };
+  }, [autoLockMinutes, hasPassword, isPasswordUnlocked, lockPassword]);
 
   return (
     <EncryptionContext.Provider value={value}>{children}</EncryptionContext.Provider>
